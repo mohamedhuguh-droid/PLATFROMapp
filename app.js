@@ -1,9 +1,9 @@
-// ================= FIREBASE INITIALIZATION =================
+// Firebase Initialization
 const firebaseConfig = {
   apiKey: "AIzaSyC6ADkW2grhCzynLXG02UqM4mrWtQuXPLc",
   authDomain: "platfrom-app.firebaseapp.com",
   projectId: "platfrom-app",
-  storageBucket: "platfrom-app.firebasestorage.app",
+  storageBucket: "platfrom-app.appspot.com",
   messagingSenderId: "115893301278",
   appId: "1:115893301278:web:2880a267b68c37a817be0f"
 };
@@ -11,59 +11,101 @@ const firebaseConfig = {
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+const storage = firebase.storage();
 
-// Application State
+// App State
 let currentUser = null;
 let isRegistering = false;
 let activeChatPartner = null;
 let unsubscribeChatListener = null;
 let activePostForComments = null;
 
-// Creator Pool & Posts Data
-const CREATOR_POOL = [
-  { uid: "usr_1", name: "Aria Thorne", handle: "@aria_t", avatar: "https://picsum.photos/seed/aria/150/150" },
-  { uid: "usr_2", name: "Kaelen Voss", handle: "@voss_art", avatar: "https://picsum.photos/seed/kaelen/150/150" },
-  { uid: "usr_3", name: "Elena Rostova", handle: "@elena_design", avatar: "https://picsum.photos/seed/elena/150/150" },
-  { uid: "usr_4", name: "Marcus Brody", handle: "@brody_film", avatar: "https://picsum.photos/seed/marcus/150/150" },
-  { uid: "usr_5", name: "Moulay Lhani", handle: "@moulay_lhani", avatar: "https://picsum.photos/seed/moulay/150/150" }
-];
-
 const TRENDS_DATA = [
   { category: "Technology • Trending", tag: "#Web3UI", posts: "24.5K posts" },
   { category: "Design • Trending", tag: "#Glassmorphism", posts: "18.2K posts" },
-  { category: "Artificial Intelligence", tag: "#GeminiPro", posts: "142K posts" },
-  { category: "Software • Trending", tag: "#FirebaseCore", posts: "9.8K posts" }
+  { category: "AI • Trending", tag: "#GeminiPro", posts: "142K posts" }
 ];
 
-const GENERATED_200_POSTS = Array.from({ length: 50 }, (_, i) => {
-  const creator = CREATOR_POOL[i % CREATOR_POOL.length];
-  return {
-    id: `post_${i + 1}`,
-    authorUid: creator.uid,
-    authorName: creator.name,
-    authorHandle: creator.handle,
-    authorAvatar: creator.avatar,
-    text: `Exploring dynamic physics and luxury interfaces. #${i + 1}`,
-    mediaUrl: `https://picsum.photos/seed/feed_${i + 100}/800/800`,
-    isVideo: false,
-    likesCount: Math.floor((i * 13) % 240) + 12,
-    repostsCount: Math.floor((i * 3) % 45) + 2,
-    comments: [
-      { author: "Elena", text: "Looks incredible 🔥" },
-      { author: "Marcus", text: "Clean dynamic layout!" }
-    ],
-    isLiked: false,
-    isReposted: false
-  };
+let globalPosts = [];
+
+// Navigation Engine
+function switchView(viewId) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const target = document.getElementById(viewId + '-view');
+  if (target) target.classList.add('active');
+
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  let navKey = viewId;
+  if (['settings', 'chat-conversation'].includes(viewId)) navKey = 'messages';
+  const activeNav = document.querySelector(`.nav-item[data-target="${navKey}"]`);
+  if (activeNav) activeNav.classList.add('active');
+}
+
+// Authentication Handlers
+function toggleAuthMode() {
+  isRegistering = !isRegistering;
+  document.getElementById("auth-title").innerText = isRegistering ? "Create Account" : "Welcome to Platform";
+  document.getElementById("auth-submit-btn").innerText = isRegistering ? "Sign Up" : "Sign In";
+  document.getElementById("toggle-auth-btn").innerText = isRegistering 
+    ? "Already have an account? Sign In" 
+    : "Don't have an account? Sign Up";
+}
+
+document.getElementById("auth-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("auth-email").value.trim();
+  const password = document.getElementById("auth-password").value.trim();
+
+  try {
+    if (isRegistering) {
+      const cred = await auth.createUserWithEmailAndPassword(email, password);
+      await db.collection("users").doc(cred.user.uid).set({
+        uid: cred.user.uid,
+        email: email,
+        username: email.split("@")[0],
+        avatar: `https://picsum.photos/seed/${cred.user.uid}/150/150`,
+        createdAt: Date.now()
+      });
+    } else {
+      await auth.signInWithEmailAndPassword(email, password);
+    }
+  } catch (err) {
+    alert(err.message);
+  }
 });
 
-function convertFileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = error => reject(error);
-    reader.readAsDataURL(file);
-  });
+function handleLogout() {
+  auth.signOut();
+}
+
+// Auth State Monitor
+auth.onAuthStateChanged((user) => {
+  if (user) {
+    currentUser = user;
+    switchView('home');
+    setupUserProfile(user);
+    renderStories();
+    listenToFeedPosts();
+    renderTrends();
+    renderMessagesList();
+  } else {
+    currentUser = null;
+    switchView('auth');
+  }
+});
+
+function setupUserProfile(user) {
+  const username = user.email ? user.email.split("@")[0] : "user";
+  document.getElementById("profile-username").innerText = username;
+  document.getElementById("header-handle").innerText = `@${username}`;
+  document.getElementById("profile-avatar").src = `https://picsum.photos/seed/${user.uid}/150/150`;
+}
+
+// Media Upload Logic using Firebase Storage
+async function uploadMediaFile(file) {
+  const fileRef = storage.ref(`uploads/${Date.now()}_${file.name}`);
+  const snapshot = await fileRef.put(file);
+  return await snapshot.ref.getDownloadURL();
 }
 
 function updateComposerFileLabel(input) {
@@ -74,117 +116,104 @@ function updateChatFileLabel(input) {
   document.getElementById("chat-file-indicator").classList.toggle("hidden", input.files.length === 0);
 }
 
-function switchView(viewId) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  const target = document.getElementById(viewId + '-view');
-  if (target) target.classList.add('active');
+// Post Submission Logic
+async function submitNewPost() {
+  const textInput = document.getElementById("composer-text");
+  const fileInput = document.getElementById("composer-file");
+  const btn = document.getElementById("post-submit-btn");
 
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  let navKey = viewId;
-  if (['settings', 'chat-conversation', 'user-profile'].includes(viewId)) navKey = 'messages';
-  const activeNav = document.querySelector(`.nav-item[data-target="${navKey}"]`);
-  if (activeNav) activeNav.classList.add('active');
-}
+  if (!textInput.value.trim() && fileInput.files.length === 0) return;
 
-// Auth Listener
-auth.onAuthStateChanged((user) => {
-  if (user) {
-    currentUser = user;
-    switchView('home');
-    setupUserProfile(user);
-    renderStories();
-    renderFeed();
-    renderTrends();
-    renderExploreGrid();
-    renderMessagesList();
-  } else {
-    currentUser = null;
-    switchView('auth');
+  btn.innerText = "Posting...";
+  btn.disabled = true;
+
+  try {
+    let mediaUrl = "";
+    let isVideo = false;
+
+    if (fileInput.files.length > 0) {
+      const file = fileInput.files[0];
+      isVideo = file.type.startsWith("video/");
+      mediaUrl = await uploadMediaFile(file);
+    }
+
+    const username = currentUser.email.split("@")[0];
+    await db.collection("posts").add({
+      authorUid: currentUser.uid,
+      authorName: username,
+      authorHandle: `@${username}`,
+      authorAvatar: `https://picsum.photos/seed/${currentUser.uid}/150/150`,
+      text: textInput.value.trim(),
+      mediaUrl: mediaUrl,
+      isVideo: isVideo,
+      likes: [],
+      comments: [],
+      createdAt: Date.now()
+    });
+
+    textInput.value = "";
+    fileInput.value = "";
+    document.getElementById("composer-file-name").innerText = "";
+  } catch (err) {
+    alert("Post creation failed: " + err.message);
+  } finally {
+    btn.innerText = "Post";
+    btn.disabled = false;
   }
-});
-
-function setupUserProfile(user) {
-  const isDev = user.email === "moulaylhani@gmail.com";
-  const username = user.email ? user.email.split("@")[0] : "user";
-  
-  document.getElementById("profile-username").innerText = username;
-  document.getElementById("header-handle").innerText = `@${username}`;
-  document.getElementById("badge-dev").classList.toggle("hidden", !isDev);
-  document.getElementById("badge-og").classList.toggle("hidden", !isDev);
 }
 
-// Render Instagram Stories Bar
-function renderStories() {
-  const container = document.getElementById("stories-slider");
-  if (!container) return;
-  container.innerHTML = CREATOR_POOL.map((creator, idx) => `
-    <div class="story-item" onclick="viewStory('${creator.name}')">
-      <div class="story-ring ${idx > 2 ? 'seen' : ''}">
-        <img src="${creator.avatar}">
-      </div>
-      <span class="story-username">${creator.name.split(' ')[0]}</span>
-    </div>
-  `).join('');
+// Real-Time Feed Monitor
+function listenToFeedPosts() {
+  db.collection("posts").orderBy("createdAt", "desc").onSnapshot(snapshot => {
+    globalPosts = [];
+    snapshot.forEach(doc => {
+      globalPosts.push({ id: doc.id, ...doc.data() });
+    });
+    renderFeed();
+  });
 }
 
-// Render X-Style Trends
-function renderTrends() {
-  const list = document.getElementById("trends-list");
-  if (!list) return;
-  list.innerHTML = TRENDS_DATA.map(t => `
-    <div class="trend-card">
-      <div class="trend-category">${t.category}</div>
-      <div class="trend-tag">${t.tag}</div>
-      <div class="trend-posts">${t.posts}</div>
-    </div>
-  `).join('');
-}
-
-// Render Main Feed
 function renderFeed() {
   const feed = document.getElementById("feed-container");
   if (!feed) return;
   feed.innerHTML = "";
 
-  GENERATED_200_POSTS.forEach((post) => {
+  globalPosts.forEach((post) => {
+    const isLiked = post.likes && post.likes.includes(currentUser.uid);
     const postEl = document.createElement("div");
     postEl.className = "post";
 
-    let mediaHTML = post.mediaUrl ? `
-      <div class="post-media" onclick="handleDoubleTap('${post.id}', event)">
-        <img src="${post.mediaUrl}" loading="lazy">
-        <i class="fa-solid fa-heart heart-burst" id="burst-${post.id}"></i>
-      </div>` : '';
+    let mediaHTML = "";
+    if (post.mediaUrl) {
+      mediaHTML = post.isVideo ? `
+        <div class="post-media" onclick="handleDoubleTap('${post.id}', event)">
+          <video src="${post.mediaUrl}" controls></video>
+          <i class="fa-solid fa-heart heart-burst" id="burst-${post.id}"></i>
+        </div>` : `
+        <div class="post-media" onclick="handleDoubleTap('${post.id}', event)">
+          <img src="${post.mediaUrl}" loading="lazy">
+          <i class="fa-solid fa-heart heart-burst" id="burst-${post.id}"></i>
+        </div>`;
+    }
 
     postEl.innerHTML = `
       <div class="post-header">
-        <div class="user-info" onclick="openUserProfile('${post.authorUid}')">
-          <img src="${post.authorAvatar}" class="user-avatar">
-          <div>
-            <div style="font-weight:600; font-size:14px; display:flex; align-items:center;">
-              ${post.authorName}
-              <i class="fa-solid fa-circle-check golden-badge glow-gold"></i>
-            </div>
-            <div style="font-size:11px; color:#888;">${post.authorHandle}</div>
-          </div>
+        <img src="${post.authorAvatar}" class="user-avatar">
+        <div>
+          <div style="font-weight:600; font-size:14px;">${post.authorName} <i class="fa-solid fa-circle-check golden-badge glow-gold"></i></div>
+          <div style="font-size:11px; color:#888;">${post.authorHandle}</div>
         </div>
       </div>
-      
-      <div style="font-size:13px; line-height:1.4;">${post.text}</div>
+      <div style="font-size:13px; line-height:1.4;">${post.text || ''}</div>
       ${mediaHTML}
-
       <div class="post-actions">
-        <button class="action-btn ${post.isLiked ? 'liked' : ''}" onclick="toggleLike('${post.id}')">
-          <i class="${post.isLiked ? 'fa-solid' : 'fa-regular'} fa-heart"></i>
-          <span>${post.likesCount}</span>
+        <button class="action-btn ${isLiked ? 'liked' : ''}" onclick="toggleLike('${post.id}')">
+          <i class="${isLiked ? 'fa-solid' : 'fa-regular'} fa-heart"></i>
+          <span>${(post.likes || []).length}</span>
         </button>
         <button class="action-btn" onclick="openComments('${post.id}')">
           <i class="fa-regular fa-comment"></i>
-          <span>${post.comments.length}</span>
-        </button>
-        <button class="action-btn ${post.isReposted ? 'reposted' : ''}" onclick="toggleRepost('${post.id}')">
-          <i class="fa-solid fa-retweet"></i>
-          <span>${post.repostsCount}</span>
+          <span>${(post.comments || []).length}</span>
         </button>
       </div>
     `;
@@ -192,49 +221,45 @@ function renderFeed() {
   });
 }
 
-// Double Tap Heart Physics
+// Double-Tap Heart Visuals
 let lastTap = 0;
 function handleDoubleTap(postId, event) {
   const now = new Date().getTime();
-  const timespan = now - lastTap;
-  if (timespan < 300 && timespan > 0) {
+  if (now - lastTap < 300) {
     const burst = document.getElementById(`burst-${postId}`);
     if (burst) {
       burst.classList.add("animate");
-      setTimeout(() => burst.classList.remove("animate"), 800);
+      setTimeout(() => burst.classList.remove("animate"), 600);
     }
-    const post = GENERATED_200_POSTS.find(p => p.id === postId);
-    if (post && !post.isLiked) toggleLike(postId);
+    toggleLike(postId, true);
   }
   lastTap = now;
 }
 
-function toggleLike(postId) {
-  const post = GENERATED_200_POSTS.find(p => p.id === postId);
-  if (post) {
-    post.isLiked = !post.isLiked;
-    post.likesCount += post.isLiked ? 1 : -1;
-    renderFeed();
+async function toggleLike(postId, forceLike = false) {
+  const postRef = db.collection("posts").doc(postId);
+  const doc = await postRef.get();
+  if (!doc.exists) return;
+
+  const likes = doc.data().likes || [];
+  const index = likes.indexOf(currentUser.uid);
+
+  if (index === -1) {
+    likes.push(currentUser.uid);
+  } else if (!forceLike) {
+    likes.splice(index, 1);
   }
+  await postRef.update({ likes });
 }
 
-function toggleRepost(postId) {
-  const post = GENERATED_200_POSTS.find(p => p.id === postId);
-  if (post) {
-    post.isReposted = !post.isReposted;
-    post.repostsCount += post.isReposted ? 1 : -1;
-    renderFeed();
-  }
-}
-
-// Instagram Bottom Comments Drawer
+// Instagram Bottom Drawer Comments
 function openComments(postId) {
   activePostForComments = postId;
-  const post = GENERATED_200_POSTS.find(p => p.id === postId);
+  const post = globalPosts.find(p => p.id === postId);
   const container = document.getElementById("comments-container");
-  
-  container.innerHTML = post.comments.map(c => `
-    <div style="font-size:13px; background:rgba(255,255,255,0.04); padding:10px; border-radius:12px;">
+
+  container.innerHTML = (post.comments || []).map(c => `
+    <div style="font-size:13px; background:rgba(255,255,255,0.04); padding:8px 12px; border-radius:10px;">
       <strong style="color:var(--accent);">${c.author}:</strong> ${c.text}
     </div>
   `).join('');
@@ -248,32 +273,48 @@ function closeComments() {
   document.getElementById("sheet-backdrop").classList.remove("visible");
 }
 
-function submitComment(e) {
+async function submitComment(e) {
   e.preventDefault();
   const input = document.getElementById("comment-input");
   if (!input.value.trim() || !activePostForComments) return;
 
-  const post = GENERATED_200_POSTS.find(p => p.id === activePostForComments);
-  post.comments.push({
-    author: currentUser.email.split("@")[0],
-    text: input.value.trim()
+  const postRef = db.collection("posts").doc(activePostForComments);
+  const username = currentUser.email.split("@")[0];
+
+  await postRef.update({
+    comments: firebase.firestore.FieldValue.arrayUnion({
+      author: username,
+      text: input.value.trim(),
+      createdAt: Date.now()
+    })
   });
 
   input.value = "";
-  openComments(activePostForComments);
-  renderFeed();
+  closeComments();
 }
 
-// Direct Messaging & Explore Grid Functions
-function renderMessagesList() {
+// Real-Time Inbox & Direct Messaging
+async function renderMessagesList() {
   const container = document.getElementById("msg-list");
   if (!container) return;
-  container.innerHTML = CREATOR_POOL.map(user => `
-    <div class="msg-item interactive-hover" onclick="openChat('${user.uid}', '${user.name}', '${user.avatar}')" style="display:flex; gap:12px; padding:12px; align-items:center; cursor:pointer;">
-      <img src="${user.avatar}" style="width:42px; height:42px; border-radius:50%; object-fit:cover;">
+
+  const snapshot = await db.collection("users").get();
+  const users = [];
+  snapshot.forEach(doc => {
+    if (doc.id !== currentUser.uid) users.push(doc.data());
+  });
+
+  if (users.length === 0) {
+    container.innerHTML = `<div style="padding:20px; text-align:center; color:#888; font-size:13px;">No registered users found yet. Invite someone to sign up!</div>`;
+    return;
+  }
+
+  container.innerHTML = users.map(user => `
+    <div class="msg-item" onclick="openChat('${user.uid}', '${user.username}', '${user.avatar}')" style="display:flex; gap:12px; padding:12px; align-items:center; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.04);">
+      <img src="${user.avatar}" style="width:40px; height:40px; border-radius:50%; object-fit:cover;">
       <div>
-        <div style="font-weight:600; font-size:14px;">${user.name} <i class="fa-solid fa-circle-check golden-badge glow-gold"></i></div>
-        <div style="font-size:12px; color:#888;">Active now</div>
+        <div style="font-weight:600; font-size:14px;">${user.username}</div>
+        <div style="font-size:11px; color:#888;">Active user</div>
       </div>
     </div>
   `).join('');
@@ -308,7 +349,15 @@ function listenToLiveMessages(partnerUid) {
         const isMe = msg.senderUid === currentUser.uid;
         const bubble = document.createElement("div");
         bubble.className = `chat-bubble ${isMe ? 'sent' : 'received'}`;
-        bubble.innerText = msg.text;
+        
+        let content = msg.text ? `<div>${msg.text}</div>` : '';
+        if (msg.mediaUrl) {
+          content += msg.isVideo 
+            ? `<video src="${msg.mediaUrl}" controls class="chat-media"></video>` 
+            : `<img src="${msg.mediaUrl}" class="chat-media">`;
+        }
+        
+        bubble.innerHTML = content;
         stream.appendChild(bubble);
       });
       stream.scrollTop = stream.scrollHeight;
@@ -318,24 +367,54 @@ function listenToLiveMessages(partnerUid) {
 async function sendChatMessage(e) {
   e.preventDefault();
   const textInput = document.getElementById("chat-message-input");
-  if (!textInput.value.trim()) return;
+  const fileInput = document.getElementById("chat-file");
+
+  if (!textInput.value.trim() && fileInput.files.length === 0) return;
+
+  let mediaUrl = "";
+  let isVideo = false;
+
+  if (fileInput.files.length > 0) {
+    const file = fileInput.files[0];
+    isVideo = file.type.startsWith("video/");
+    mediaUrl = await uploadMediaFile(file);
+  }
 
   const conversationId = getConversationId(currentUser.uid, activeChatPartner.uid);
   await db.collection("conversations").doc(conversationId).collection("messages").add({
     senderUid: currentUser.uid,
     text: textInput.value.trim(),
+    mediaUrl: mediaUrl,
+    isVideo: isVideo,
     createdAt: Date.now()
   });
 
   textInput.value = "";
+  fileInput.value = "";
+  document.getElementById("chat-file-indicator").classList.add("hidden");
 }
 
-function renderExploreGrid() {
-  const grid = document.getElementById("explore-grid");
-  if (!grid) return;
-  grid.innerHTML = GENERATED_200_POSTS.slice(0, 24).map(p => `
-    <div class="grid-item" style="aspect-ratio:1/1; overflow:hidden; border-radius:10px;">
-      <img src="${p.mediaUrl}" style="width:100%; height:100%; object-fit:cover;">
+function renderStories() {
+  const container = document.getElementById("stories-slider");
+  if (!container) return;
+  container.innerHTML = Array.from({ length: 6 }).map((_, i) => `
+    <div class="story-item">
+      <div class="story-ring ${i > 2 ? 'seen' : ''}">
+        <img src="https://picsum.photos/seed/story_${i}/100/100">
+      </div>
+      <span class="story-username">User_${i + 1}</span>
+    </div>
+  `).join('');
+}
+
+function renderTrends() {
+  const list = document.getElementById("trends-list");
+  if (!list) return;
+  list.innerHTML = TRENDS_DATA.map(t => `
+    <div class="trend-card">
+      <div class="trend-category">${t.category}</div>
+      <div class="trend-tag">${t.tag}</div>
+      <div class="trend-posts">${t.posts}</div>
     </div>
   `).join('');
 }
