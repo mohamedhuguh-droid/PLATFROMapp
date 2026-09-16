@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Platform App - iOS 26 Glass Edition</title>
+<title>Platform App - Pro Dynamic Edition</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -13,15 +13,15 @@
     <!-- AUTHENTICATION VIEW -->
     <div id="auth-view" class="view active">
         <div class="auth-overlay">
-            <div class="auth-card">
-                <div class="logo-icon">P</div>
+            <div class="auth-card pulse-glow">
+                <div class="logo-icon scale-in">P</div>
                 <h2 id="auth-title">Welcome to Platform</h2>
                 <p id="auth-sub" style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Sign in or create an account to start</p>
 
                 <form id="auth-form">
                     <input type="email" id="auth-email" class="glass-input" placeholder="Email (e.g., moulaylhani@gmail.com)" required>
                     <input type="password" id="auth-password" class="glass-input" placeholder="Password" required>
-                    <button type="submit" id="auth-submit-btn" class="glass-btn primary">Sign In</button>
+                    <button type="submit" id="auth-submit-btn" class="glass-btn primary ripple-effect">Sign In</button>
                 </form>
 
                 <div class="auth-toggle">
@@ -35,27 +35,33 @@
     <div id="home-view" class="view">
         <div class="header">
             <div class="header-left">
-                <div class="logo-icon">P</div> Platform
+                <div class="logo-icon bounce-subtle">P</div> Platform
             </div>
             <div class="header-right">
-                <i class="fa-regular fa-compass" onclick="switchView('explore')"></i>
-                <i class="fa-regular fa-paper-plane" onclick="switchView('messages')"></i>
+                <i class="fa-regular fa-compass hover-rotate" onclick="switchView('explore')"></i>
+                <i class="fa-regular fa-paper-plane hover-bounce" onclick="switchView('messages')"></i>
             </div>
         </div>
         
         <!-- Post Composer -->
-        <div class="composer-card">
-            <textarea id="composer-text" placeholder="What's on your mind?" rows="2"></textarea>
+        <div class="composer-card glass-focus">
+            <textarea id="composer-text" placeholder="What's happening?" rows="2"></textarea>
             <div class="composer-actions">
-                <input type="url" id="composer-media" placeholder="Image URL (optional)">
-                <button onclick="submitNewPost()" class="glass-btn sm">Post</button>
+                <label for="composer-file" class="file-picker-label interactive-hover">
+                    <i class="fa-solid fa-photo-film"></i> Photo / Video
+                </label>
+                <input type="file" id="composer-file" accept="image/*,video/*" style="display:none;" onchange="updateComposerFileLabel(this)">
+                <span id="composer-file-name" class="file-status"></span>
+                <button onclick="submitNewPost()" class="glass-btn sm float-btn">Post</button>
             </div>
         </div>
 
-        <!-- Notes Bar -->
-        <div class="notes-container" id="notes-slider"></div>
+        <!-- Instagram Stories Bar -->
+        <div class="stories-wrapper">
+            <div class="stories-container" id="stories-slider"></div>
+        </div>
 
-        <!-- Main Feed (200+ Posts) -->
+        <!-- Main Feed -->
         <div id="feed-container"></div>
     </div>
 
@@ -65,11 +71,18 @@
             <div class="header-left">Explore</div>
         </div>
         <div class="explore-search-container">
-            <div class="explore-search">
+            <div class="explore-search glass-focus">
                 <i class="fa-solid fa-magnifying-glass" style="color: #999;"></i>
-                <input type="text" id="explore-search-input" placeholder="Search people, quotes, and shots...">
+                <input type="text" id="explore-search-input" placeholder="Search trends, people, quotes...">
             </div>
         </div>
+
+        <!-- X-Style Trends Section -->
+        <div class="trends-section">
+            <div class="section-title">Trends for you</div>
+            <div id="trends-list"></div>
+        </div>
+
         <div class="explore-grid" id="explore-grid"></div>
     </div>
 
@@ -77,22 +90,48 @@
     <div id="messages-view" class="view">
         <div class="header">
             <div class="header-left">Inbox</div>
-            <div class="header-right"><i class="fa-solid fa-pen-to-square"></i></div>
+            <div class="header-right"><i class="fa-solid fa-pen-to-square hover-bounce"></i></div>
         </div>
         <div class="msg-container" id="msg-list"></div>
     </div>
 
     <!-- CHAT CONVERSATION VIEW -->
     <div id="chat-conversation-view" class="view">
-        <div class="header">
-            <div class="header-left" onclick="switchView('messages')">
-                <i class="fa-solid fa-chevron-left"></i> <span id="chat-user-header">Chat</span>
+        <div class="chat-header">
+            <div class="chat-header-left" onclick="switchView('messages')">
+                <i class="fa-solid fa-chevron-left back-arrow-anim"></i>
+                <img id="chat-header-avatar" src="https://picsum.photos/seed/user/100/100" class="chat-avatar avatar-pulse">
+                <div class="chat-header-info">
+                    <span id="chat-user-header" class="chat-header-name">Chat</span>
+                    <span class="chat-header-status"><span class="status-dot"></span> Active now</span>
+                </div>
+            </div>
+            <div class="chat-header-actions">
+                <i class="fa-solid fa-phone hover-bounce"></i>
+                <i class="fa-solid fa-video hover-bounce"></i>
             </div>
         </div>
+
         <div id="chat-messages-container" class="chat-stream"></div>
-        <form id="chat-form" class="chat-input-bar" onsubmit="sendChatMessage(event)">
-            <input type="text" id="chat-message-input" placeholder="Type a message..." required>
-            <button type="submit" class="glass-btn sm"><i class="fa-solid fa-paper-plane"></i></button>
+
+        <div id="typing-indicator" class="typing-container hidden">
+            <div class="typing-bubble">
+                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            </div>
+        </div>
+
+        <form id="chat-form" class="ig-chat-input-bar" onsubmit="sendChatMessage(event)">
+            <label for="chat-file" class="ig-media-btn hover-rotate">
+                <i class="fa-solid fa-image"></i>
+            </label>
+            <input type="file" id="chat-file" accept="image/*,video/*" style="display:none;" onchange="updateChatFileLabel(this)">
+            
+            <div class="ig-input-wrapper glass-focus">
+                <input type="text" id="chat-message-input" placeholder="Message..." autocomplete="off">
+                <span id="chat-file-indicator" class="chat-file-badge hidden"><i class="fa-solid fa-paperclip"></i> File</span>
+            </div>
+
+            <button type="submit" class="ig-send-btn active-pop"><i class="fa-solid fa-paper-plane"></i></button>
         </form>
     </div>
 
@@ -100,7 +139,7 @@
     <div id="profile-view" class="view">
         <div class="header">
             <div class="header-left"><i class="fa-solid fa-lock"></i> <span id="header-handle">user</span></div>
-            <div class="header-right"><i class="fa-solid fa-gear" onclick="switchView('settings')"></i></div>
+            <div class="header-right"><i class="fa-solid fa-gear hover-rotate" onclick="switchView('settings')"></i></div>
         </div>
         
         <div class="profile-header">
@@ -110,7 +149,7 @@
             </div>
             <div class="profile-name-badges">
                 <div class="profile-name" id="profile-username">User</div>
-                <i class="fa-solid fa-circle-check golden-badge" title="Verified Creator"></i>
+                <i class="fa-solid fa-circle-check golden-badge glow-gold" title="Verified Creator"></i>
                 <span id="badge-dev" class="badge badge-dev hidden">DEV</span>
                 <span id="badge-og" class="badge badge-og hidden">OG</span>
             </div>
@@ -132,17 +171,31 @@
     <div id="settings-view" class="view">
         <div class="header">
             <div class="header-left" onclick="switchView('profile')">
-                <i class="fa-solid fa-chevron-left"></i> <span>Settings</span>
+                <i class="fa-solid fa-chevron-left back-arrow-anim"></i> <span>Settings</span>
             </div>
         </div>
         <div class="settings-group" style="margin-top: 30px;">
             <ul class="settings-list">
-                <li id="logout-btn" style="justify-content: center; color: #ff3b30; font-weight: 700; cursor: pointer;">
+                <li id="logout-btn" class="interactive-hover" style="justify-content: center; color: #ff3b30; font-weight: 700; cursor: pointer;">
                     Log Out
                 </li>
             </ul>
         </div>
     </div>
+
+    <!-- COMMENTS DRAWER (INSTAGRAM SHEET STYLE) -->
+    <div id="comments-sheet" class="sheet-drawer">
+        <div class="sheet-header">
+            <div class="sheet-bar"></div>
+            <span>Comments</span>
+        </div>
+        <div id="comments-container" class="sheet-content"></div>
+        <form id="comment-form" onsubmit="submitComment(event)" class="sheet-input-bar">
+            <input type="text" id="comment-input" placeholder="Add a comment..." required>
+            <button type="submit">Post</button>
+        </form>
+    </div>
+    <div id="sheet-backdrop" class="sheet-backdrop" onclick="closeComments()"></div>
 
     <!-- BOTTOM NAVIGATION -->
     <div class="bottom-nav" id="main-nav">
