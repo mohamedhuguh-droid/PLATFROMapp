@@ -14,28 +14,26 @@
     <div id="auth-view" class="view active">
         <div class="auth-overlay">
             <div class="auth-card">
-                <div class="logo-icon" style="margin: 0 auto 15px;">P</div>
+                <div class="logo-icon">P</div>
                 <h2 id="auth-title">Welcome to Platform</h2>
-                <p id="auth-sub">Sign in to continue</p>
+                <p id="auth-sub" style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Sign in or create an account to start</p>
 
                 <form id="auth-form">
-                    <input type="email" id="auth-email" class="glass-input" placeholder="Email" required>
+                    <input type="email" id="auth-email" class="glass-input" placeholder="Email (e.g., moulaylhani@gmail.com)" required>
                     <input type="password" id="auth-password" class="glass-input" placeholder="Password" required>
                     <button type="submit" id="auth-submit-btn" class="glass-btn primary">Sign In</button>
                 </form>
 
                 <div class="auth-toggle">
-                    <span id="toggle-auth-btn">Don't have an account? Sign Up</span>
-                    <span id="reset-password-btn">Forgot Password?</span>
+                    <span id="toggle-auth-btn" onclick="toggleAuthMode()">Don't have an account? Sign Up</span>
                 </div>
-                <p id="auth-error-msg" class="error-msg"></p>
             </div>
         </div>
     </div>
     
     <!-- HOME VIEW -->
     <div id="home-view" class="view">
-        <div class="header" style="border-bottom: none; background: transparent; backdrop-filter: none;">
+        <div class="header">
             <div class="header-left">
                 <div class="logo-icon">P</div> Platform
             </div>
@@ -45,63 +43,43 @@
             </div>
         </div>
         
-        <!-- Post Composer Form -->
+        <!-- Post Composer -->
         <div class="composer-card">
-            <textarea id="composer-text" placeholder="What's happening?" rows="2"></textarea>
+            <textarea id="composer-text" placeholder="What's on your mind?" rows="2"></textarea>
             <div class="composer-actions">
-                <input type="url" id="composer-media" placeholder="Optional Image URL">
-                <button id="emoji-picker-btn" type="button" class="icon-btn"><i class="fa-regular fa-face-smile"></i></button>
-                <button id="post-submit-btn" class="glass-btn sm">Post</button>
+                <input type="url" id="composer-media" placeholder="Image URL (optional)">
+                <button onclick="submitNewPost()" class="glass-btn sm">Post</button>
             </div>
         </div>
 
-        <div class="notes-container" id="notes-slider">
-            <!-- Dynamically populated via Firestore -->
-        </div>
+        <!-- Notes Bar -->
+        <div class="notes-container" id="notes-slider"></div>
 
-        <div id="feed-container">
-            <!-- Dynamically populated via Firestore -->
-        </div>
+        <!-- Main Feed (200+ Posts) -->
+        <div id="feed-container"></div>
     </div>
 
     <!-- EXPLORE VIEW -->
     <div id="explore-view" class="view">
-        <div class="header" style="border-bottom: none; padding-bottom: 10px;">
+        <div class="header">
             <div class="header-left">Explore</div>
         </div>
         <div class="explore-search-container">
             <div class="explore-search">
                 <i class="fa-solid fa-magnifying-glass" style="color: #999;"></i>
-                <input type="text" id="explore-search-input" placeholder="Search people, pics, and videos...">
+                <input type="text" id="explore-search-input" placeholder="Search people, quotes, and shots...">
             </div>
         </div>
-        <div class="explore-categories">
-            <div class="category-chip active">For You</div>
-            <div class="category-chip">Photography</div>
-            <div class="category-chip">Coding</div>
-            <div class="category-chip">Modding</div>
-            <div class="category-chip">Math</div>
-        </div>
-        <div class="explore-grid" id="explore-grid">
-            <!-- Dynamically populated -->
-        </div>
+        <div class="explore-grid" id="explore-grid"></div>
     </div>
 
     <!-- MESSAGES VIEW -->
     <div id="messages-view" class="view">
         <div class="header">
             <div class="header-left">Inbox</div>
-            <div class="header-right"><i class="fa-solid fa-pen-to-square" style="font-size: 18px;"></i></div>
+            <div class="header-right"><i class="fa-solid fa-pen-to-square"></i></div>
         </div>
-        <div class="explore-search-container" style="top: 0; padding-top: 0; border-bottom: none;">
-            <div class="explore-search" style="padding: 8px 15px;">
-                <i class="fa-solid fa-magnifying-glass" style="color: #999; font-size: 13px;"></i>
-                <input type="text" placeholder="Search messages..." style="font-size: 14px;">
-            </div>
-        </div>
-        <div class="msg-container" id="msg-list">
-            <!-- Dynamically populated User Conversations -->
-        </div>
+        <div class="msg-container" id="msg-list"></div>
     </div>
 
     <!-- CHAT CONVERSATION VIEW -->
@@ -112,7 +90,7 @@
             </div>
         </div>
         <div id="chat-messages-container" class="chat-stream"></div>
-        <form id="chat-form" class="chat-input-bar">
+        <form id="chat-form" class="chat-input-bar" onsubmit="sendChatMessage(event)">
             <input type="text" id="chat-message-input" placeholder="Type a message..." required>
             <button type="submit" class="glass-btn sm"><i class="fa-solid fa-paper-plane"></i></button>
         </form>
@@ -120,83 +98,35 @@
 
     <!-- PROFILE VIEW -->
     <div id="profile-view" class="view">
-        <div class="header" style="background: transparent; border-bottom: none;">
-            <div class="header-left"><i class="fa-solid fa-lock" style="font-size: 14px; margin-right: 5px;"></i> <span id="header-handle">user</span></div>
-            <div class="header-right"><i class="fa-solid fa-bars" onclick="switchView('settings')"></i></div>
+        <div class="header">
+            <div class="header-left"><i class="fa-solid fa-lock"></i> <span id="header-handle">user</span></div>
+            <div class="header-right"><i class="fa-solid fa-gear" onclick="switchView('settings')"></i></div>
         </div>
         
         <div class="profile-header">
-            <div class="profile-avatar-container">
-                <img id="profile-avatar" src="https://picsum.photos/seed/moulay_av/300/300" class="profile-avatar" alt="Avatar">
+            <div class="profile-avatar-container" onclick="editProfilePicture()">
+                <img id="profile-avatar" src="https://picsum.photos/seed/user/300/300" class="profile-avatar" alt="Avatar">
+                <div class="avatar-edit-overlay"><i class="fa-solid fa-camera"></i></div>
             </div>
             <div class="profile-name-badges">
                 <div class="profile-name" id="profile-username">User</div>
+                <i class="fa-solid fa-circle-check golden-badge" title="Verified Creator"></i>
                 <span id="badge-dev" class="badge badge-dev hidden">DEV</span>
                 <span id="badge-og" class="badge badge-og hidden">OG</span>
             </div>
-            <div class="profile-bio" id="profile-bio">Developer & Creator</div>
+            <div class="profile-bio" id="profile-bio">Digital Creator</div>
             <div class="profile-stats">
-                <div class="stat-item">
-                    <div class="stat-val" id="stat-posts">0</div>
-                    <div class="stat-label">Posts</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-val" id="stat-followers">0</div>
-                    <div class="stat-label">Followers</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-val" id="stat-following">0</div>
-                    <div class="stat-label">Following</div>
-                </div>
+                <div class="stat-item"><div class="stat-val" id="stat-posts">0</div><div class="stat-label">Posts</div></div>
+                <div class="stat-item"><div class="stat-val" id="stat-followers">12.4K</div><div class="stat-label">Followers</div></div>
+                <div class="stat-item"><div class="stat-val" id="stat-following">480</div><div class="stat-label">Following</div></div>
             </div>
         </div>
 
-        <div class="profile-tabs-nav">
-            <div class="profile-tab-btn active" onclick="switchProfileTab('posts', this)"><i class="fa-solid fa-table-cells"></i></div>
-            <div class="profile-tab-btn" onclick="switchProfileTab('portfolio', this)"><i class="fa-solid fa-briefcase"></i></div>
-        </div>
-
-        <div class="profile-grid" id="profile-grid-section">
-            <!-- User Grid Posts -->
-        </div>
-
-        <div class="portfolio-section hidden" id="profile-portfolio-section">
-            <div class="portfolio-card">
-                <div class="portfolio-card-header">
-                    <div class="portfolio-icon" style="background: rgba(10, 132, 255, 0.2); color: #0a84ff;"><i class="fa-solid fa-code"></i></div>
-                    <div>
-                        <div class="portfolio-title">Platform Web App</div>
-                        <div class="portfolio-subtitle">GitHub Pages & Firebase</div>
-                    </div>
-                </div>
-                <div class="portfolio-desc">A custom-built social application designed with iOS Glassmorphism and Firestore real-time storage.</div>
-                <div class="portfolio-tags">
-                    <span class="portfolio-tag">HTML5</span>
-                    <span class="portfolio-tag">CSS Glass</span>
-                    <span class="portfolio-tag">Firestore</span>
-                </div>
-            </div>
-        </div>
+        <div class="profile-grid" id="profile-grid-section"></div>
     </div>
 
-    <!-- POST DETAIL VIEW -->
-    <div id="post-detail-view" class="view">
-        <div class="header">
-            <div class="header-left" onclick="switchView('home')">
-                <i class="fa-solid fa-chevron-left"></i> <span>Post</span>
-            </div>
-        </div>
-        
-        <div id="active-post-content" class="post" style="border-bottom: none; padding-bottom: 0;"></div>
-
-        <div class="comments-section" id="moulay-comments"></div>
-        
-        <form class="add-comment-bar" onsubmit="addComment(event)">
-            <img id="comment-user-avatar" src="https://picsum.photos/seed/moulay_av/100/100" class="comment-avatar" alt="You">
-            <input type="text" id="comment-input" placeholder="Add a comment..." required>
-            <button type="submit">Post</button>
-        </form>
-    </div>
+    <!-- EXTERNAL USER PROFILE VIEW -->
+    <div id="user-profile-view" class="view"></div>
 
     <!-- SETTINGS VIEW -->
     <div id="settings-view" class="view">
@@ -205,20 +135,7 @@
                 <i class="fa-solid fa-chevron-left"></i> <span>Settings</span>
             </div>
         </div>
-        
         <div class="settings-group" style="margin-top: 30px;">
-            <ul class="settings-list">
-                <li>
-                    <div>
-                        <div class="settings-icon" style="background: #30d158;"><i class="fa-solid fa-lock"></i></div>
-                        Private Account
-                    </div>
-                    <div class="toggle-switch" onclick="toggleSwitch(this)"></div>
-                </li>
-            </ul>
-        </div>
-
-        <div class="settings-group" style="margin-top: 40px; background: rgba(255,59,48,0.1); border-color: rgba(255,59,48,0.2);">
             <ul class="settings-list">
                 <li id="logout-btn" style="justify-content: center; color: #ff3b30; font-weight: 700; cursor: pointer;">
                     Log Out
@@ -235,16 +152,6 @@
         <div class="nav-item" onclick="switchView('profile')" data-target="profile"><i class="fa-solid fa-user"></i></div>
     </div>
 
-    <!-- MODAL FOR NOTES -->
-    <div class="modal-overlay" id="note-modal" onclick="closeNoteModal()">
-        <div class="note-modal-content" onclick="event.stopPropagation()">
-            <img src="" id="modal-avatar" class="note-modal-avatar" alt="User">
-            <div class="note-modal-name" id="modal-name">Username</div>
-            <div class="note-modal-text" id="modal-text">"Quote text goes here."</div>
-            <button class="note-modal-close" onclick="closeNoteModal()">Close</button>
-        </div>
-    </div>
-
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -252,5 +159,4 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 <script src="app.js"></script>
 </body>
-</html></body>
 </html>
