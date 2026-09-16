@@ -16,59 +16,64 @@ const db = firebase.firestore();
 let currentUser = null;
 let isRegistering = false;
 let activeChatPartner = null;
-const NOTE_EXPIRATION_MS = 5 * 60 * 60 * 1000; // 5-Hour Expiration
+let unsubscribeChatListener = null;
+let activePostForComments = null;
 
-// ================= 200+ UNIQUE FEED GENERATOR =================
+// Creator Pool & Posts Data
 const CREATOR_POOL = [
-  { name: "Aria Thorne", handle: "@aria_t", avatar: "https://picsum.photos/seed/aria/150/150" },
-  { name: "Kaelen Voss", handle: "@voss_art", avatar: "https://picsum.photos/seed/kaelen/150/150" },
-  { name: "Elena Rostova", handle: "@elena_design", avatar: "https://picsum.photos/seed/elena/150/150" },
-  { name: "Marcus Brody", handle: "@brody_film", avatar: "https://picsum.photos/seed/marcus/150/150" },
-  { name: "Moulay Lhani", handle: "@moulay_lhani", avatar: "https://picsum.photos/seed/moulay/150/150" }
+  { uid: "usr_1", name: "Aria Thorne", handle: "@aria_t", avatar: "https://picsum.photos/seed/aria/150/150" },
+  { uid: "usr_2", name: "Kaelen Voss", handle: "@voss_art", avatar: "https://picsum.photos/seed/kaelen/150/150" },
+  { uid: "usr_3", name: "Elena Rostova", handle: "@elena_design", avatar: "https://picsum.photos/seed/elena/150/150" },
+  { uid: "usr_4", name: "Marcus Brody", handle: "@brody_film", avatar: "https://picsum.photos/seed/marcus/150/150" },
+  { uid: "usr_5", name: "Moulay Lhani", handle: "@moulay_lhani", avatar: "https://picsum.photos/seed/moulay/150/150" }
 ];
 
-const QUOTES_CAPTION_POOL = [
-  "“Simplicity is the ultimate sophistication.” — Leonardo da Vinci",
-  "Captured this stunning architectural glow during golden hour.",
-  "“Code is like humor. When you have to explain it, it’s bad.” — Cory House",
-  "Reflecting on clean glass UI mechanics and real-time social architectures.",
-  "“Design is not just what it looks like and feels like. Design is how it works.”",
-  "Minimalism isn't the lack of something. It's simply the perfect amount of everything.",
-  "Late night compiling sessions hit differently with this dark mode aesthetic."
+const TRENDS_DATA = [
+  { category: "Technology • Trending", tag: "#Web3UI", posts: "24.5K posts" },
+  { category: "Design • Trending", tag: "#Glassmorphism", posts: "18.2K posts" },
+  { category: "Artificial Intelligence", tag: "#GeminiPro", posts: "142K posts" },
+  { category: "Software • Trending", tag: "#FirebaseCore", posts: "9.8K posts" }
 ];
 
-// Seed 215 unique feed items dynamically
-const GENERATED_200_POSTS = Array.from({ length: 215 }, (_, i) => {
+const GENERATED_200_POSTS = Array.from({ length: 50 }, (_, i) => {
   const creator = CREATOR_POOL[i % CREATOR_POOL.length];
-  const quote = QUOTES_CAPTION_POOL[i % QUOTES_CAPTION_POOL.length];
   return {
-    id: `generated_post_${i + 1}`,
-    authorUid: `user_${(i % 5) + 1}`,
+    id: `post_${i + 1}`,
+    authorUid: creator.uid,
     authorName: creator.name,
     authorHandle: creator.handle,
     authorAvatar: creator.avatar,
-    text: `${quote} #${i + 1}`,
-    mediaUrl: `https://picsum.photos/seed/glass_feed_${i + 100}/800/800`,
+    text: `Exploring dynamic physics and luxury interfaces. #${i + 1}`,
+    mediaUrl: `https://picsum.photos/seed/feed_${i + 100}/800/800`,
+    isVideo: false,
     likesCount: Math.floor((i * 13) % 240) + 12,
     repostsCount: Math.floor((i * 3) % 45) + 2,
+    comments: [
+      { author: "Elena", text: "Looks incredible 🔥" },
+      { author: "Marcus", text: "Clean dynamic layout!" }
+    ],
     isLiked: false,
-    isReposted: false,
-    comments: [{ id: `c_${i}`, authorName: "Alex", text: "Incredible shot!" }]
+    isReposted: false
   };
 });
 
-let USER_NOTES = [
-  { id: "n_1", uid: "usr_moulay", name: "Moulay", avatar: "https://picsum.photos/seed/moulay/150/150", text: "Platform v2 is live! ⚡", createdAt: Date.now() }
-];
+function convertFileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
+  });
+}
 
-let DIRECT_MESSAGES = {
-  "usr_1": [
-    { sender: "usr_1", text: "Hey! Loved your recent portfolio update." },
-    { sender: "me", text: "Appreciate it! Working on glass UI aesthetics now." }
-  ]
-};
+function updateComposerFileLabel(input) {
+  document.getElementById("composer-file-name").innerText = input.files.length > 0 ? input.files[0].name : "";
+}
 
-// ================= VIEW SWITCHING & NAV =================
+function updateChatFileLabel(input) {
+  document.getElementById("chat-file-indicator").classList.toggle("hidden", input.files.length === 0);
+}
+
 function switchView(viewId) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const target = document.getElementById(viewId + '-view');
@@ -76,48 +81,20 @@ function switchView(viewId) {
 
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   let navKey = viewId;
-  if (['settings', 'chat-conversation', 'user-profile'].includes(viewId)) navKey = 'profile';
+  if (['settings', 'chat-conversation', 'user-profile'].includes(viewId)) navKey = 'messages';
   const activeNav = document.querySelector(`.nav-item[data-target="${navKey}"]`);
   if (activeNav) activeNav.classList.add('active');
 }
 
-// ================= AUTHENTICATION & DEV BADGES =================
-function toggleAuthMode() {
-  isRegistering = !isRegistering;
-  document.getElementById("auth-title").innerText = isRegistering ? "Create Account" : "Welcome to Platform";
-  document.getElementById("auth-submit-btn").innerText = isRegistering ? "Sign Up" : "Sign In";
-  document.getElementById("toggle-auth-btn").innerText = isRegistering ? "Already have an account? Sign In" : "Don't have an account? Sign Up";
-}
-
-document.getElementById("auth-form")?.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const email = document.getElementById("auth-email").value.trim();
-  const password = document.getElementById("auth-password").value;
-
-  try {
-    if (isRegistering) {
-      const res = await auth.createUserWithEmailAndPassword(email, password);
-      await db.collection("users").doc(res.user.uid).set({
-        email: email,
-        username: email.split("@")[0],
-        bio: "Digital Creator & Platform Member",
-        avatar: `https://picsum.photos/seed/${res.user.uid}/300/300`
-      });
-    } else {
-      await auth.signInWithEmailAndPassword(email, password);
-    }
-  } catch (err) {
-    alert(err.message);
-  }
-});
-
+// Auth Listener
 auth.onAuthStateChanged((user) => {
   if (user) {
     currentUser = user;
     switchView('home');
     setupUserProfile(user);
-    renderNotes();
+    renderStories();
     renderFeed();
+    renderTrends();
     renderExploreGrid();
     renderMessagesList();
   } else {
@@ -126,73 +103,110 @@ auth.onAuthStateChanged((user) => {
   }
 });
 
-document.getElementById("logout-btn")?.addEventListener("click", () => auth.signOut());
-
 function setupUserProfile(user) {
   const isDev = user.email === "moulaylhani@gmail.com";
   const username = user.email ? user.email.split("@")[0] : "user";
   
   document.getElementById("profile-username").innerText = username;
   document.getElementById("header-handle").innerText = `@${username}`;
-
-  // Toggle DEV / OG Badges strictly for moulaylhani@gmail.com
   document.getElementById("badge-dev").classList.toggle("hidden", !isDev);
   document.getElementById("badge-og").classList.toggle("hidden", !isDev);
+}
 
-  db.collection("users").doc(user.uid).get().then(doc => {
-    if (doc.exists && doc.data().avatar) {
-      document.getElementById("profile-avatar").src = doc.data().avatar;
-    }
+// Render Instagram Stories Bar
+function renderStories() {
+  const container = document.getElementById("stories-slider");
+  if (!container) return;
+  container.innerHTML = CREATOR_POOL.map((creator, idx) => `
+    <div class="story-item" onclick="viewStory('${creator.name}')">
+      <div class="story-ring ${idx > 2 ? 'seen' : ''}">
+        <img src="${creator.avatar}">
+      </div>
+      <span class="story-username">${creator.name.split(' ')[0]}</span>
+    </div>
+  `).join('');
+}
+
+// Render X-Style Trends
+function renderTrends() {
+  const list = document.getElementById("trends-list");
+  if (!list) return;
+  list.innerHTML = TRENDS_DATA.map(t => `
+    <div class="trend-card">
+      <div class="trend-category">${t.category}</div>
+      <div class="trend-tag">${t.tag}</div>
+      <div class="trend-posts">${t.posts}</div>
+    </div>
+  `).join('');
+}
+
+// Render Main Feed
+function renderFeed() {
+  const feed = document.getElementById("feed-container");
+  if (!feed) return;
+  feed.innerHTML = "";
+
+  GENERATED_200_POSTS.forEach((post) => {
+    const postEl = document.createElement("div");
+    postEl.className = "post";
+
+    let mediaHTML = post.mediaUrl ? `
+      <div class="post-media" onclick="handleDoubleTap('${post.id}', event)">
+        <img src="${post.mediaUrl}" loading="lazy">
+        <i class="fa-solid fa-heart heart-burst" id="burst-${post.id}"></i>
+      </div>` : '';
+
+    postEl.innerHTML = `
+      <div class="post-header">
+        <div class="user-info" onclick="openUserProfile('${post.authorUid}')">
+          <img src="${post.authorAvatar}" class="user-avatar">
+          <div>
+            <div style="font-weight:600; font-size:14px; display:flex; align-items:center;">
+              ${post.authorName}
+              <i class="fa-solid fa-circle-check golden-badge glow-gold"></i>
+            </div>
+            <div style="font-size:11px; color:#888;">${post.authorHandle}</div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="font-size:13px; line-height:1.4;">${post.text}</div>
+      ${mediaHTML}
+
+      <div class="post-actions">
+        <button class="action-btn ${post.isLiked ? 'liked' : ''}" onclick="toggleLike('${post.id}')">
+          <i class="${post.isLiked ? 'fa-solid' : 'fa-regular'} fa-heart"></i>
+          <span>${post.likesCount}</span>
+        </button>
+        <button class="action-btn" onclick="openComments('${post.id}')">
+          <i class="fa-regular fa-comment"></i>
+          <span>${post.comments.length}</span>
+        </button>
+        <button class="action-btn ${post.isReposted ? 'reposted' : ''}" onclick="toggleRepost('${post.id}')">
+          <i class="fa-solid fa-retweet"></i>
+          <span>${post.repostsCount}</span>
+        </button>
+      </div>
+    `;
+    feed.appendChild(postEl);
   });
 }
 
-// ================= EDIT PROFILE PICTURE =================
-async function editProfilePicture() {
-  if (!currentUser) return;
-  const newUrl = prompt("Enter new Profile Picture Image URL:");
-  if (newUrl && newUrl.trim()) {
-    const url = newUrl.trim();
-    await db.collection("users").doc(currentUser.uid).set({ avatar: url }, { merge: true });
-    document.getElementById("profile-avatar").src = url;
-    alert("Profile picture updated!");
+// Double Tap Heart Physics
+let lastTap = 0;
+function handleDoubleTap(postId, event) {
+  const now = new Date().getTime();
+  const timespan = now - lastTap;
+  if (timespan < 300 && timespan > 0) {
+    const burst = document.getElementById(`burst-${postId}`);
+    if (burst) {
+      burst.classList.add("animate");
+      setTimeout(() => burst.classList.remove("animate"), 800);
+    }
+    const post = GENERATED_200_POSTS.find(p => p.id === postId);
+    if (post && !post.isLiked) toggleLike(postId);
   }
-}
-
-// ================= POSTING & REPOSTING =================
-async function submitNewPost() {
-  const text = document.getElementById("composer-text").value.trim();
-  const mediaUrl = document.getElementById("composer-media").value.trim();
-  if (!text && !mediaUrl) return;
-
-  const isDev = currentUser?.email === "moulaylhani@gmail.com";
-  const newPost = {
-    id: `custom_${Date.now()}`,
-    authorUid: currentUser.uid,
-    authorName: currentUser.email.split("@")[0],
-    authorHandle: `@${currentUser.email.split("@")[0]}`,
-    authorAvatar: document.getElementById("profile-avatar").src,
-    text: text,
-    mediaUrl: mediaUrl,
-    likesCount: 0,
-    repostsCount: 0,
-    isLiked: false,
-    isReposted: false,
-    comments: []
-  };
-
-  GENERATED_200_POSTS.unshift(newPost);
-  document.getElementById("composer-text").value = "";
-  document.getElementById("composer-media").value = "";
-  renderFeed();
-}
-
-function deletePost(postId) {
-  if (!confirm("Delete this post?")) return;
-  const idx = GENERATED_200_POSTS.findIndex(p => p.id === postId);
-  if (idx !== -1) {
-    GENERATED_200_POSTS.splice(idx, 1);
-    renderFeed();
-  }
+  lastTap = now;
 }
 
 function toggleLike(postId) {
@@ -213,176 +227,115 @@ function toggleRepost(postId) {
   }
 }
 
-// ================= RENDER FEED (200+ POSTS & GOLD BADGES) =================
-function renderFeed() {
-  const feed = document.getElementById("feed-container");
-  if (!feed) return;
-  feed.innerHTML = "";
-
-  GENERATED_200_POSTS.forEach((post) => {
-    const isMyPost = currentUser && post.authorUid === currentUser.uid;
-    const postEl = document.createElement("div");
-    postEl.className = "post";
-
-    postEl.innerHTML = `
-      <div class="post-header">
-        <div class="user-info" onclick="openUserProfile('${post.authorUid}')">
-          <img src="${post.authorAvatar}" class="user-avatar">
-          <div>
-            <div style="font-weight:600; font-size:14px; display:flex; align-items:center;">
-              ${post.authorName}
-              <i class="fa-solid fa-circle-check golden-badge" title="Verified Account"></i>
-            </div>
-            <div style="font-size:11px; color:#888;">${post.authorHandle}</div>
-          </div>
-        </div>
-        ${isMyPost ? `<i class="fa-solid fa-trash-can" style="color:#ff3b30; cursor:pointer; font-size:13px;" onclick="deletePost('${post.id}')"></i>` : ''}
-      </div>
-      
-      <div style="font-size:13px; line-height:1.4;">${post.text}</div>
-      ${post.mediaUrl ? `<div class="post-media"><img src="${post.mediaUrl}" loading="lazy"></div>` : ''}
-
-      <div class="post-actions">
-        <button class="action-btn ${post.isLiked ? 'liked' : ''}" onclick="toggleLike('${post.id}')">
-          <i class="${post.isLiked ? 'fa-solid' : 'fa-regular'} fa-heart"></i>
-          <span>${post.likesCount}</span>
-        </button>
-        <button class="action-btn ${post.isReposted ? 'reposted' : ''}" onclick="toggleRepost('${post.id}')">
-          <i class="fa-solid fa-retweet"></i>
-          <span>${post.repostsCount}</span>
-        </button>
-      </div>
-    `;
-    feed.appendChild(postEl);
-  });
-}
-
-// ================= NOTES (5-HR EXPIRATION & DELETION) =================
-function renderNotes() {
-  const rail = document.getElementById("notes-slider");
-  if (!rail) return;
-
-  const now = Date.now();
-  USER_NOTES = USER_NOTES.filter(n => (now - n.createdAt) < NOTE_EXPIRATION_MS);
-
-  rail.innerHTML = `
-    <div class="note-item" onclick="promptAddNote()">
-      <div class="note-avatar-wrapper">
-        <img src="${document.getElementById('profile-avatar')?.src || 'https://picsum.photos/seed/self/100/100'}" class="note-avatar" style="border-style:dashed;">
-        <div class="note-bubble-badge" style="background:#30d158;">+ Note</div>
-      </div>
-      <span style="font-size:11px; margin-top:4px; color:#aaa;">Add Note</span>
-    </div>
-  ` + USER_NOTES.map(n => `
-    <div class="note-item" onclick="handleNoteClick('${n.id}', '${n.uid}')">
-      <div class="note-avatar-wrapper">
-        <img src="${n.avatar}" class="note-avatar">
-        <div class="note-bubble-badge">${n.text}</div>
-      </div>
-      <span style="font-size:11px; margin-top:4px; color:#aaa;">${n.name}</span>
+// Instagram Bottom Comments Drawer
+function openComments(postId) {
+  activePostForComments = postId;
+  const post = GENERATED_200_POSTS.find(p => p.id === postId);
+  const container = document.getElementById("comments-container");
+  
+  container.innerHTML = post.comments.map(c => `
+    <div style="font-size:13px; background:rgba(255,255,255,0.04); padding:10px; border-radius:12px;">
+      <strong style="color:var(--accent);">${c.author}:</strong> ${c.text}
     </div>
   `).join('');
+
+  document.getElementById("comments-sheet").classList.add("open");
+  document.getElementById("sheet-backdrop").classList.add("visible");
 }
 
-function promptAddNote() {
-  const text = prompt("Share a note (max 30 chars, disappears in 5 hrs):");
-  if (text && text.trim()) {
-    USER_NOTES.unshift({
-      id: `note_${Date.now()}`,
-      uid: currentUser ? currentUser.uid : "self",
-      name: "You",
-      avatar: document.getElementById("profile-avatar").src,
-      text: text.trim().substring(0, 30),
-      createdAt: Date.now()
-    });
-    renderNotes();
-  }
+function closeComments() {
+  document.getElementById("comments-sheet").classList.remove("open");
+  document.getElementById("sheet-backdrop").classList.remove("visible");
 }
 
-function handleNoteClick(noteId, authorUid) {
-  if (currentUser && (authorUid === currentUser.uid || authorUid === "self")) {
-    if (confirm("Delete your note?")) {
-      USER_NOTES = USER_NOTES.filter(n => n.id !== noteId);
-      renderNotes();
-    }
-  } else {
-    openUserProfile(authorUid);
-  }
+function submitComment(e) {
+  e.preventDefault();
+  const input = document.getElementById("comment-input");
+  if (!input.value.trim() || !activePostForComments) return;
+
+  const post = GENERATED_200_POSTS.find(p => p.id === activePostForComments);
+  post.comments.push({
+    author: currentUser.email.split("@")[0],
+    text: input.value.trim()
+  });
+
+  input.value = "";
+  openComments(activePostForComments);
+  renderFeed();
 }
 
-// ================= MESSAGES & INTERACTION =================
+// Direct Messaging & Explore Grid Functions
 function renderMessagesList() {
   const container = document.getElementById("msg-list");
   if (!container) return;
-  container.innerHTML = CREATOR_POOL.slice(0, 3).map(user => `
-    <div class="msg-item" onclick="openChat('${user.name}')">
+  container.innerHTML = CREATOR_POOL.map(user => `
+    <div class="msg-item interactive-hover" onclick="openChat('${user.uid}', '${user.name}', '${user.avatar}')" style="display:flex; gap:12px; padding:12px; align-items:center; cursor:pointer;">
       <img src="${user.avatar}" style="width:42px; height:42px; border-radius:50%; object-fit:cover;">
       <div>
-        <div style="font-weight:600; font-size:14px;">${user.name} <i class="fa-solid fa-circle-check golden-badge"></i></div>
-        <div style="font-size:12px; color:#888;">Tap to open chat conversation...</div>
+        <div style="font-weight:600; font-size:14px;">${user.name} <i class="fa-solid fa-circle-check golden-badge glow-gold"></i></div>
+        <div style="font-size:12px; color:#888;">Active now</div>
       </div>
     </div>
   `).join('');
 }
 
-function openChat(userName) {
-  activeChatPartner = userName;
-  document.getElementById("chat-user-header").innerText = userName;
+function openChat(partnerUid, partnerName, partnerAvatar) {
+  activeChatPartner = { uid: partnerUid, name: partnerName, avatar: partnerAvatar };
+  document.getElementById("chat-user-header").innerText = partnerName;
+  document.getElementById("chat-header-avatar").src = partnerAvatar;
   switchView("chat-conversation");
-  renderChatStream();
+  listenToLiveMessages(partnerUid);
 }
 
-function renderChatStream() {
-  const stream = document.getElementById("chat-messages-container");
-  const msgs = DIRECT_MESSAGES["usr_1"] || [];
-  stream.innerHTML = msgs.map(m => `
-    <div class="chat-bubble ${m.sender === 'me' ? 'sent' : 'received'}">${m.text}</div>
-  `).join('');
+function getConversationId(uid1, uid2) {
+  return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
 }
 
-function sendChatMessage(e) {
+function listenToLiveMessages(partnerUid) {
+  if (unsubscribeChatListener) unsubscribeChatListener();
+  const conversationId = getConversationId(currentUser.uid, partnerUid);
+
+  unsubscribeChatListener = db.collection("conversations")
+    .doc(conversationId)
+    .collection("messages")
+    .orderBy("createdAt", "asc")
+    .onSnapshot(snapshot => {
+      const stream = document.getElementById("chat-messages-container");
+      stream.innerHTML = "";
+
+      snapshot.forEach(doc => {
+        const msg = doc.data();
+        const isMe = msg.senderUid === currentUser.uid;
+        const bubble = document.createElement("div");
+        bubble.className = `chat-bubble ${isMe ? 'sent' : 'received'}`;
+        bubble.innerText = msg.text;
+        stream.appendChild(bubble);
+      });
+      stream.scrollTop = stream.scrollHeight;
+    });
+}
+
+async function sendChatMessage(e) {
   e.preventDefault();
-  const input = document.getElementById("chat-message-input");
-  if (!input.value.trim()) return;
-  if (!DIRECT_MESSAGES["usr_1"]) DIRECT_MESSAGES["usr_1"] = [];
-  DIRECT_MESSAGES["usr_1"].push({ sender: "me", text: input.value.trim() });
-  input.value = "";
-  renderChatStream();
+  const textInput = document.getElementById("chat-message-input");
+  if (!textInput.value.trim()) return;
+
+  const conversationId = getConversationId(currentUser.uid, activeChatPartner.uid);
+  await db.collection("conversations").doc(conversationId).collection("messages").add({
+    senderUid: currentUser.uid,
+    text: textInput.value.trim(),
+    createdAt: Date.now()
+  });
+
+  textInput.value = "";
 }
 
-// ================= EXPLORE & EXTERNAL PROFILES =================
 function renderExploreGrid() {
   const grid = document.getElementById("explore-grid");
   if (!grid) return;
-  grid.innerHTML = GENERATED_200_POSTS.slice(0, 30).map(p => `
-    <div class="grid-item" onclick="openUserProfile('${p.authorUid}')">
-      <img src="${p.mediaUrl}" loading="lazy">
+  grid.innerHTML = GENERATED_200_POSTS.slice(0, 24).map(p => `
+    <div class="grid-item" style="aspect-ratio:1/1; overflow:hidden; border-radius:10px;">
+      <img src="${p.mediaUrl}" style="width:100%; height:100%; object-fit:cover;">
     </div>
   `).join('');
-}
-
-function openUserProfile(uid) {
-  if (currentUser && uid === currentUser.uid) {
-    switchView('profile');
-    return;
-  }
-  const creator = CREATOR_POOL.find(c => c.avatar.includes(uid)) || CREATOR_POOL[0];
-  const container = document.getElementById("user-profile-view");
-  container.innerHTML = `
-    <div class="header">
-      <div class="header-left" onclick="switchView('home')"><i class="fa-solid fa-chevron-left"></i> <span>Back</span></div>
-    </div>
-    <div class="profile-header">
-      <img src="${creator.avatar}" class="profile-avatar" style="width:80px; height:80px; border-radius:50%;">
-      <div class="profile-name-badges" style="margin-top:10px;">
-        ${creator.name} <i class="fa-solid fa-circle-check golden-badge"></i>
-      </div>
-      <div class="profile-bio">${creator.handle} • Verified Creator</div>
-      <button onclick="openChat('${creator.name}')" class="glass-btn sm" style="margin-top:10px;">Message</button>
-    </div>
-    <div class="profile-grid">
-      ${GENERATED_200_POSTS.filter(p => p.authorName === creator.name).map(p => `<div class="grid-item"><img src="${p.mediaUrl}"></div>`).join('')}
-    </div>
-  `;
-  switchView('user-profile');
 }
