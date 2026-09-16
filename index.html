@@ -3,29 +3,40 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Platform App - Pro Edition</title>
+<title>Platform App - Enterprise Pro</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="app">
 
+    <!-- UPLOAD OVERLAY INDICATOR -->
+    <div id="upload-overlay" class="upload-overlay hidden">
+        <div class="upload-modal">
+            <div class="spinner"></div>
+            <div id="upload-status-text">Uploading Media...</div>
+            <div class="progress-bar-container">
+                <div id="upload-progress-bar" class="progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- AUTHENTICATION VIEW -->
     <div id="auth-view" class="view active">
         <div class="auth-overlay">
-            <div class="auth-card pulse-glow">
-                <div class="logo-icon scale-in">P</div>
+            <div class="auth-card">
+                <div class="logo-icon">P</div>
                 <h2 id="auth-title">Welcome to Platform</h2>
-                <p id="auth-sub" style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Sign in or create an account to start</p>
+                <p id="auth-sub">Connect, share, and discover in real-time.</p>
 
                 <form id="auth-form">
-                    <input type="email" id="auth-email" class="glass-input" placeholder="Email address" required>
-                    <input type="password" id="auth-password" class="glass-input" placeholder="Password" required>
+                    <input type="email" id="auth-email" class="glass-input" placeholder="Email address" required autocomplete="email">
+                    <input type="password" id="auth-password" class="glass-input" placeholder="Password" required autocomplete="current-password">
                     <button type="submit" id="auth-submit-btn" class="glass-btn primary">Sign In</button>
                 </form>
 
-                <div class="auth-toggle" style="margin-top: 16px; text-align: center;">
-                    <span id="toggle-auth-btn" style="color: var(--accent); cursor: pointer; font-size: 13px;" onclick="toggleAuthMode()">Don't have an account? Sign Up</span>
+                <div class="auth-toggle">
+                    <span id="toggle-auth-btn" onclick="toggleAuthMode()">Don't have an account? Sign Up</span>
                 </div>
             </div>
         </div>
@@ -35,28 +46,34 @@
     <div id="home-view" class="view">
         <div class="header">
             <div class="header-left">
-                <div class="logo-icon">P</div> Platform
+                <div class="logo-icon">P</div> <span>Platform</span>
             </div>
             <div class="header-right">
-                <i class="fa-regular fa-compass" onclick="switchView('explore')"></i>
-                <i class="fa-regular fa-paper-plane" onclick="switchView('messages')"></i>
+                <i class="fa-regular fa-compass hover-icon" onclick="switchView('explore')"></i>
+                <i class="fa-regular fa-paper-plane hover-icon" onclick="switchView('messages')"></i>
             </div>
         </div>
         
         <!-- Post Composer -->
         <div class="composer-card">
-            <textarea id="composer-text" placeholder="What's happening?" rows="2"></textarea>
+            <textarea id="composer-text" placeholder="What's on your mind?" rows="2"></textarea>
+            
+            <div id="composer-preview" class="media-preview-container hidden">
+                <span class="remove-preview" onclick="clearComposerMedia()">&times;</span>
+                <img id="composer-img-preview" class="hidden">
+                <video id="composer-video-preview" controls class="hidden"></video>
+            </div>
+
             <div class="composer-actions">
                 <label for="composer-file" class="file-picker-label">
-                    <i class="fa-solid fa-photo-film"></i> Media
+                    <i class="fa-solid fa-photo-film"></i> Photo / Video
                 </label>
-                <input type="file" id="composer-file" accept="image/*,video/*" style="display:none;" onchange="updateComposerFileLabel(this)">
-                <span id="composer-file-name" class="file-status"></span>
+                <input type="file" id="composer-file" accept="image/*,video/*" style="display:none;" onchange="handleMediaPreview(this)">
                 <button id="post-submit-btn" onclick="submitNewPost()" class="glass-btn sm">Post</button>
             </div>
         </div>
 
-        <!-- Instagram-Style Stories Bar -->
+        <!-- Instagram Stories Bar -->
         <div class="stories-wrapper">
             <div class="stories-container" id="stories-slider"></div>
         </div>
@@ -72,14 +89,13 @@
         </div>
         <div class="explore-search-container">
             <div class="explore-search">
-                <i class="fa-solid fa-magnifying-glass" style="color: #999;"></i>
-                <input type="text" id="explore-search-input" placeholder="Search trends, people, topics...">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" id="explore-search-input" placeholder="Search trends, users, posts..." oninput="handleExploreSearch(this.value)">
             </div>
         </div>
 
-        <!-- X-Style Trends Section -->
         <div class="trends-section">
-            <div class="section-title">Trends for you</div>
+            <div class="section-title">Trending Topics</div>
             <div id="trends-list"></div>
         </div>
 
@@ -90,7 +106,6 @@
     <div id="messages-view" class="view">
         <div class="header">
             <div class="header-left">Inbox</div>
-            <div class="header-right"><i class="fa-solid fa-pen-to-square"></i></div>
         </div>
         <div class="msg-container" id="msg-list"></div>
     </div>
@@ -100,10 +115,10 @@
         <div class="chat-header">
             <div class="chat-header-left" onclick="switchView('messages')">
                 <i class="fa-solid fa-chevron-left"></i>
-                <img id="chat-header-avatar" src="https://picsum.photos/seed/user/100/100" class="chat-avatar">
+                <img id="chat-header-avatar" src="https://picsum.photos/seed/placeholder/100/100" class="chat-avatar">
                 <div class="chat-header-info">
                     <span id="chat-user-header" class="chat-header-name">Chat</span>
-                    <span class="chat-header-status"><span class="status-dot"></span> Active now</span>
+                    <span class="chat-header-status"><span class="status-dot"></span> Active</span>
                 </div>
             </div>
         </div>
@@ -112,13 +127,13 @@
 
         <form id="chat-form" class="ig-chat-input-bar" onsubmit="sendChatMessage(event)">
             <label for="chat-file" class="ig-media-btn">
-                <i class="fa-solid fa-image"></i>
+                <i class="fa-solid fa-paperclip"></i>
             </label>
             <input type="file" id="chat-file" accept="image/*,video/*" style="display:none;" onchange="updateChatFileLabel(this)">
             
             <div class="ig-input-wrapper">
                 <input type="text" id="chat-message-input" placeholder="Message..." autocomplete="off">
-                <span id="chat-file-indicator" class="chat-file-badge hidden"><i class="fa-solid fa-paperclip"></i> Attached</span>
+                <span id="chat-file-indicator" class="chat-file-badge hidden"><i class="fa-solid fa-check"></i> Media Ready</span>
             </div>
 
             <button type="submit" class="ig-send-btn"><i class="fa-solid fa-paper-plane"></i></button>
@@ -153,10 +168,8 @@
                 <i class="fa-solid fa-chevron-left"></i> <span>Settings</span>
             </div>
         </div>
-        <div class="settings-group" style="margin-top: 30px; padding: 20px;">
-            <button onclick="handleLogout()" class="glass-btn primary" style="background: #ff3b30; border: none; width: 100%;">
-                Log Out
-            </button>
+        <div class="settings-group">
+            <button onclick="handleLogout()" class="glass-btn danger-btn">Log Out</button>
         </div>
     </div>
 
@@ -184,7 +197,7 @@
 
 </div>
 
-<!-- Firebase SDKs -->
+<!-- Firebase SDK Core & Services -->
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
