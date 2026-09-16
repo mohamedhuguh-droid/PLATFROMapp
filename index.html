@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Platform App - Pro Dynamic Edition</title>
+<title>Platform App - Pro Edition</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -19,13 +19,13 @@
                 <p id="auth-sub" style="color: #aaa; font-size: 13px; margin-bottom: 20px;">Sign in or create an account to start</p>
 
                 <form id="auth-form">
-                    <input type="email" id="auth-email" class="glass-input" placeholder="Email (e.g., moulaylhani@gmail.com)" required>
+                    <input type="email" id="auth-email" class="glass-input" placeholder="Email address" required>
                     <input type="password" id="auth-password" class="glass-input" placeholder="Password" required>
-                    <button type="submit" id="auth-submit-btn" class="glass-btn primary ripple-effect">Sign In</button>
+                    <button type="submit" id="auth-submit-btn" class="glass-btn primary">Sign In</button>
                 </form>
 
-                <div class="auth-toggle">
-                    <span id="toggle-auth-btn" onclick="toggleAuthMode()">Don't have an account? Sign Up</span>
+                <div class="auth-toggle" style="margin-top: 16px; text-align: center;">
+                    <span id="toggle-auth-btn" style="color: var(--accent); cursor: pointer; font-size: 13px;" onclick="toggleAuthMode()">Don't have an account? Sign Up</span>
                 </div>
             </div>
         </div>
@@ -35,28 +35,28 @@
     <div id="home-view" class="view">
         <div class="header">
             <div class="header-left">
-                <div class="logo-icon bounce-subtle">P</div> Platform
+                <div class="logo-icon">P</div> Platform
             </div>
             <div class="header-right">
-                <i class="fa-regular fa-compass hover-rotate" onclick="switchView('explore')"></i>
-                <i class="fa-regular fa-paper-plane hover-bounce" onclick="switchView('messages')"></i>
+                <i class="fa-regular fa-compass" onclick="switchView('explore')"></i>
+                <i class="fa-regular fa-paper-plane" onclick="switchView('messages')"></i>
             </div>
         </div>
         
         <!-- Post Composer -->
-        <div class="composer-card glass-focus">
+        <div class="composer-card">
             <textarea id="composer-text" placeholder="What's happening?" rows="2"></textarea>
             <div class="composer-actions">
-                <label for="composer-file" class="file-picker-label interactive-hover">
-                    <i class="fa-solid fa-photo-film"></i> Photo / Video
+                <label for="composer-file" class="file-picker-label">
+                    <i class="fa-solid fa-photo-film"></i> Media
                 </label>
                 <input type="file" id="composer-file" accept="image/*,video/*" style="display:none;" onchange="updateComposerFileLabel(this)">
                 <span id="composer-file-name" class="file-status"></span>
-                <button onclick="submitNewPost()" class="glass-btn sm float-btn">Post</button>
+                <button id="post-submit-btn" onclick="submitNewPost()" class="glass-btn sm">Post</button>
             </div>
         </div>
 
-        <!-- Instagram Stories Bar -->
+        <!-- Instagram-Style Stories Bar -->
         <div class="stories-wrapper">
             <div class="stories-container" id="stories-slider"></div>
         </div>
@@ -71,9 +71,9 @@
             <div class="header-left">Explore</div>
         </div>
         <div class="explore-search-container">
-            <div class="explore-search glass-focus">
+            <div class="explore-search">
                 <i class="fa-solid fa-magnifying-glass" style="color: #999;"></i>
-                <input type="text" id="explore-search-input" placeholder="Search trends, people, quotes...">
+                <input type="text" id="explore-search-input" placeholder="Search trends, people, topics...">
             </div>
         </div>
 
@@ -90,7 +90,7 @@
     <div id="messages-view" class="view">
         <div class="header">
             <div class="header-left">Inbox</div>
-            <div class="header-right"><i class="fa-solid fa-pen-to-square hover-bounce"></i></div>
+            <div class="header-right"><i class="fa-solid fa-pen-to-square"></i></div>
         </div>
         <div class="msg-container" id="msg-list"></div>
     </div>
@@ -99,87 +99,64 @@
     <div id="chat-conversation-view" class="view">
         <div class="chat-header">
             <div class="chat-header-left" onclick="switchView('messages')">
-                <i class="fa-solid fa-chevron-left back-arrow-anim"></i>
-                <img id="chat-header-avatar" src="https://picsum.photos/seed/user/100/100" class="chat-avatar avatar-pulse">
+                <i class="fa-solid fa-chevron-left"></i>
+                <img id="chat-header-avatar" src="https://picsum.photos/seed/user/100/100" class="chat-avatar">
                 <div class="chat-header-info">
                     <span id="chat-user-header" class="chat-header-name">Chat</span>
                     <span class="chat-header-status"><span class="status-dot"></span> Active now</span>
                 </div>
             </div>
-            <div class="chat-header-actions">
-                <i class="fa-solid fa-phone hover-bounce"></i>
-                <i class="fa-solid fa-video hover-bounce"></i>
-            </div>
         </div>
 
         <div id="chat-messages-container" class="chat-stream"></div>
 
-        <div id="typing-indicator" class="typing-container hidden">
-            <div class="typing-bubble">
-                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-            </div>
-        </div>
-
         <form id="chat-form" class="ig-chat-input-bar" onsubmit="sendChatMessage(event)">
-            <label for="chat-file" class="ig-media-btn hover-rotate">
+            <label for="chat-file" class="ig-media-btn">
                 <i class="fa-solid fa-image"></i>
             </label>
             <input type="file" id="chat-file" accept="image/*,video/*" style="display:none;" onchange="updateChatFileLabel(this)">
             
-            <div class="ig-input-wrapper glass-focus">
+            <div class="ig-input-wrapper">
                 <input type="text" id="chat-message-input" placeholder="Message..." autocomplete="off">
-                <span id="chat-file-indicator" class="chat-file-badge hidden"><i class="fa-solid fa-paperclip"></i> File</span>
+                <span id="chat-file-indicator" class="chat-file-badge hidden"><i class="fa-solid fa-paperclip"></i> Attached</span>
             </div>
 
-            <button type="submit" class="ig-send-btn active-pop"><i class="fa-solid fa-paper-plane"></i></button>
+            <button type="submit" class="ig-send-btn"><i class="fa-solid fa-paper-plane"></i></button>
         </form>
     </div>
 
     <!-- PROFILE VIEW -->
     <div id="profile-view" class="view">
         <div class="header">
-            <div class="header-left"><i class="fa-solid fa-lock"></i> <span id="header-handle">user</span></div>
-            <div class="header-right"><i class="fa-solid fa-gear hover-rotate" onclick="switchView('settings')"></i></div>
+            <div class="header-left"><i class="fa-solid fa-lock"></i> <span id="header-handle">@user</span></div>
+            <div class="header-right"><i class="fa-solid fa-gear" onclick="switchView('settings')"></i></div>
         </div>
         
         <div class="profile-header">
-            <div class="profile-avatar-container" onclick="editProfilePicture()">
+            <div class="profile-avatar-container">
                 <img id="profile-avatar" src="https://picsum.photos/seed/user/300/300" class="profile-avatar" alt="Avatar">
-                <div class="avatar-edit-overlay"><i class="fa-solid fa-camera"></i></div>
             </div>
             <div class="profile-name-badges">
                 <div class="profile-name" id="profile-username">User</div>
-                <i class="fa-solid fa-circle-check golden-badge glow-gold" title="Verified Creator"></i>
-                <span id="badge-dev" class="badge badge-dev hidden">DEV</span>
-                <span id="badge-og" class="badge badge-og hidden">OG</span>
+                <i class="fa-solid fa-circle-check golden-badge glow-gold"></i>
             </div>
             <div class="profile-bio" id="profile-bio">Digital Creator</div>
-            <div class="profile-stats">
-                <div class="stat-item"><div class="stat-val" id="stat-posts">0</div><div class="stat-label">Posts</div></div>
-                <div class="stat-item"><div class="stat-val" id="stat-followers">12.4K</div><div class="stat-label">Followers</div></div>
-                <div class="stat-item"><div class="stat-val" id="stat-following">480</div><div class="stat-label">Following</div></div>
-            </div>
         </div>
 
         <div class="profile-grid" id="profile-grid-section"></div>
     </div>
 
-    <!-- EXTERNAL USER PROFILE VIEW -->
-    <div id="user-profile-view" class="view"></div>
-
     <!-- SETTINGS VIEW -->
     <div id="settings-view" class="view">
         <div class="header">
             <div class="header-left" onclick="switchView('profile')">
-                <i class="fa-solid fa-chevron-left back-arrow-anim"></i> <span>Settings</span>
+                <i class="fa-solid fa-chevron-left"></i> <span>Settings</span>
             </div>
         </div>
-        <div class="settings-group" style="margin-top: 30px;">
-            <ul class="settings-list">
-                <li id="logout-btn" class="interactive-hover" style="justify-content: center; color: #ff3b30; font-weight: 700; cursor: pointer;">
-                    Log Out
-                </li>
-            </ul>
+        <div class="settings-group" style="margin-top: 30px; padding: 20px;">
+            <button onclick="handleLogout()" class="glass-btn primary" style="background: #ff3b30; border: none; width: 100%;">
+                Log Out
+            </button>
         </div>
     </div>
 
@@ -207,9 +184,11 @@
 
 </div>
 
+<!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
